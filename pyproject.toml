@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chatstack"
+version = "0.0.2"
+authors = [
+  { name="Bill Kish", email="bk@jiggy.ai" },
+]
+dependencies=['pydantic', 'openai', 'tiktoken', 'loguru']
+description = "Message-based LLM tools."
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/jiggy-ai/chatstack"
+"Bug Tracker" = "https://github.com/jiggy-ai/chatstack/issues"

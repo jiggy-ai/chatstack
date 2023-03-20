@@ -1,0 +1,6 @@
+
+*.pyc
+*.hnsw
+*~
+chatstack.egg-info/*
+dist/*
