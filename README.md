@@ -37,11 +37,7 @@ def main():
     print("Welcome to the Chatbot! Type 'quit' to exit.")
     
     while True:
-        user_input = input("You: ")
-        
-        if user_input.lower() == 'quit':
-            break
-
+        user_input = input("You: ")        
         response = chat_context.user_message(user_input)
         print("Chatbot:", response)
 
