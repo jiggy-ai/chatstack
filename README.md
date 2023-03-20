@@ -29,6 +29,9 @@ This Python code provides a chatbot implementation with context management using
 Example:
 
 ```python
+import os
+os.environ["OPENAI_API_KEY"] = 'YOUR_OPENAI_API_KEY'
+
 from chatstack import ChatContext
 
 BASE_SYSTEM_PROMPT  = "You are a clever bot.  Do not apologize, or make excuses.  "
