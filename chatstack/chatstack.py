@@ -1,7 +1,7 @@
 from loguru import logger
 from pydantic import BaseModel, root_validator
 from typing import Optional, List
-from retry import retry
+from .retry import retry
 import openai
 import tiktoken
 from time import time
@@ -139,7 +139,6 @@ class ChatContext:
                 sys.stdout.flush()
             sys.stdout.write("\n")
         else:
-            print(response)
             response_text = response['choices'][0]['message']['content']
         dt = time() - t0
         #logger.info(f'completion time: {dt:.3f} s')                
