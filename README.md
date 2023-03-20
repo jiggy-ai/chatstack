@@ -1,6 +1,6 @@
-# README.md
+# Chatstack
 
-## Chatbot with Context Management
+## Minimalist Context Management for message-based GPTs
 
 This Python code provides a chatbot implementation with context management using OpenAI's GPT-3.5-turbo or GPT-4 chat models. The chatbot maintains a conversation history and manages the context to ensure meaningful responses.
 
