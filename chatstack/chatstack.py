@@ -6,6 +6,7 @@ import openai
 import tiktoken
 from time import time
 import sys
+from .pricing import price
 
 encoder = tiktoken.get_encoding('cl100k_base')
 
@@ -18,8 +19,7 @@ class ChatRoleMessage(BaseModel):
     def compute_tokens(cls, values) -> int:
         _text = f'{values["role"]}\n{values["text"]}' 
         values["tokens"] = len(encoder.encode(_text))
-        values["tokens"] += 4    # XXX validate/model unknown overhead
-        logger.debug(f'tokens: {values["tokens"]}')
+        values["tokens"] += 4    # per https://platform.openai.com/docs/guides/chat/managing-tokens
         return values
 
 
@@ -31,6 +31,7 @@ class ContextMessage(ChatRoleMessage):
     """
     A message added to the model input context to provide context for the model.
     Generally contains source material from a search function
+    Includes a prefix header to provide additional context to the model as to the nature of the content
     """
     role = 'system'
     prefix: str    
@@ -44,7 +45,7 @@ class ContextMessage(ChatRoleMessage):
     def compute_tokens(cls, values) -> int:
         _text = f'{values["role"]}\n{values["prefix"]}: {values["text"]}'
         values["tokens"] = len(encoder.encode(_text))
-        values["tokens"] += 4    # XXX validate/model unknown overhead
+        values["tokens"] += 4    # per https://platform.openai.com/docs/guides/chat/managing-tokens
         return values    
 
     
@@ -57,26 +58,44 @@ class UserMessage(ChatRoleMessage):
     text: str
 
 
+class ChatResponse(BaseModel):
+    """
+    returned in response to a User Message
+    contains the complete state of the input context as sent to the model as well as the response from the model
+    and other details such as the model used, the number of tokens used, and the estimated cost of the request
+    """
+    text:               str                             # the completion response from the model
+    model:              str                             # the model used to generate the response
+    temperature:        float                           # the temperature used to generate the response
+    inputs:             List[ChatRoleMessage]           # the input context as sent to the model    
+    input_tokens:       int                             # the number of tokens used in the input context
+    response_tokens:    int                             # the number of tokens in the response text
+    price:              float                           # the estimated price of the request in dollars
+
+
+GPT3_MODELS = ['gpt-3.5-turbo', 'gpt-3.5-turbo-0301']
+GPT4_MODELS = ['gpt-4', 'gpt-4-0314']
+
 class ChatContext:
 
     def __init__(self,
-                 min_response_tokens=200,           # minimum number of tokens to reserve for model completion response;  max input context will be (4096 - min_response_tokens)
-                 max_response_tokens=400,           # maximum number of tokens to allow for model completion response
-                 max_context_assistant_messages=5,  # number of recent assistant messages to keep in context
-                 max_context_user_messages=50,      # number of recent user messages to keep in context
-                 model="gpt-3.5-turbo",
-                 temperature=0.5,
-                 base_system_msg_text="You are Jingbot, a clever bot.  Do not apologize, or make excuses.  Do not mention that you are an AI language model since that is annoying to users."):
-        """            
-        
-        """
+                 base_system_msg_text : str = "Please respond to the user request.",  # base system message to use for context
+                 min_response_tokens : int = 200,           # minimum number of tokens to reserve for model completion response;  
+                 max_response_tokens : int = 400,           # maximum number of tokens to allow for model completion response; set to None to allow unlimited use of the model context
+                 max_context_assistant_messages : int = 5,  # number of recent assistant messages to keep in context
+                 max_context_user_messages : int = 50,      # number of recent user messages to keep in context
+                 model : str = "gpt-3.5-turbo",             # model to use for completion
+                 temperature : float = 0.5):                # temperature to use for model completion
+                 
         self.model = model
         self.temperature = temperature
         self.base_system_msg = SystemMessage(text=base_system_msg_text)
-        if model == "gpt-3.5-turbo":
+        if model in GPT3_MODELS :
             self.max_model_context = 4096
-        else:
+        elif model in GPT4_MODELS:
             self.max_model_context = 8192
+        else:
+            raise ValueError(f"Model {model} not supported. Supported models are {GPT3_MODELS} and {GPT4_MODELS}")        
         self.min_response_tokens = min_response_tokens
         self.max_response_tokens = max_response_tokens
         self.max_context_assistant_messages = max_context_assistant_messages
@@ -90,7 +109,7 @@ class ChatContext:
         # maximum of max_context_user_messages user messages
         max_input_context = self.max_model_context - self.min_response_tokens
         messages = []
-        current_input_tokens = self.base_system_msg.tokens
+        current_input_tokens = 2 + self.base_system_msg.tokens   # fixed overhead of 2 tokens per completion
         current_user_messages = 0
         current_assistant_messages = 0
         for msg in self.messages:
@@ -114,8 +133,6 @@ class ChatContext:
 
     @retry(tries=10, delay=.05, ExceptionToRaise=openai.InvalidRequestError)
     def _completion(self, msgs :ChatRoleMessage, stream=False) -> str:
-        #for msg in msgs:
-        #    logger.info(f"completion message: role {msg.role}: '{msg.text}'")
 
         messages = [{"role": msg.role, "content": msg.text} for msg in msgs]
         
@@ -126,8 +143,11 @@ class ChatContext:
                                                      max_tokens = self.max_response_tokens,
                                                      temperature = self.temperature,
                                                      stream=stream)
+        except openai.error.RateLimitError as e:
+            logger.info(f'OpenAI RateLimitError, retrying...')
+            raise
         except Exception as e:
-            logger.exception(e)
+            logger.warning(f'Exception during openai.ChatCompletion.create: {e}, retrying...')
             raise
         
         response_text = ""
@@ -141,17 +161,28 @@ class ChatContext:
         else:
             response_text = response['choices'][0]['message']['content']
         dt = time() - t0
-        #logger.info(f'completion time: {dt:.3f} s')                
+        #logger.info(f'completion time: {dt:.3f} s')                                                    
         return response_text
 
     
-    def user_message(self, msg_text, stream=False) -> str:
+    def user_message(self, msg_text : str, stream : bool =False) -> ChatResponse:
         msg = UserMessage(text=msg_text)
         # put message at beginning of list
         self.messages.insert(0, msg)
-        response_text = self._completion(self._compose_completion_msg(), stream=stream)
+        completion_msgs = self._compose_completion_msg()
+        response_text = self._completion(completion_msgs, stream=stream)
         response_msg = AssistantMessage(text=response_text)
         self.messages.insert(0, response_msg)
-        return response_text
+        
+        input_tokens = sum([msg.tokens for msg in completion_msgs]) + 2            
+        cr = ChatResponse(text = response_text,
+                          model = self.model,
+                          temperature=self.temperature,
+                          inputs=completion_msgs,
+                          input_tokens=input_tokens,
+                          response_tokens=response_msg.tokens,
+                          price=price(self.model, input_tokens, response_msg.tokens))
+                                    
+        return cr
     
         
