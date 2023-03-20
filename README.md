@@ -11,6 +11,10 @@ This Python code provides a chatbot implementation with context management using
 - openai
 - tiktoken
 
+### OPEN_API_KEY
+
+Chatstack finds your OpenAI API key via the OPENAI_API_KEY environment variable.
+
 ### Classes
 
 - `ChatRoleMessage`: A base class for messages with role, text, and tokens.
@@ -29,9 +33,6 @@ This Python code provides a chatbot implementation with context management using
 Example:
 
 ```python
-import os
-os.environ["OPENAI_API_KEY"] = 'YOUR_OPENAI_API_KEY'
-
 from chatstack import ChatContext
 
 BASE_SYSTEM_PROMPT  = "You are a clever bot.  Do not apologize, or make excuses.  "
