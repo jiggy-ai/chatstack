@@ -44,9 +44,10 @@ def main():
     print("Welcome to the Chatbot!")
     
     while True:
-        user_input = input("You: ")        
+        user_input = input("You: ")      
+        print("Chatbot:")
         response = chat_context.user_message(user_input, stream=True)
-        print("Chatbot:", response)
+        
 
 if __name__ == "__main__":
     main()
