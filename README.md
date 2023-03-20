@@ -18,7 +18,7 @@ This Python code provides a chatbot implementation with context management using
 - `ContextMessage`: A message added to the model input context to provide context for the model.
 - `AssistantMessage`: A message with the role 'assistant'.
 - `UserMessage`: A message with the role 'user'.
-- `ChatContext`: A class that manages the conversation context and generates responses using the GPT-3.5-turbo model.
+- `ChatContext`: A class that manages the conversation context and generates responses using OpenAI message interface models.
 
 ### Usage
 
