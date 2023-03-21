@@ -164,7 +164,13 @@ class ChatContext:
         #logger.info(f'completion time: {dt:.3f} s')                                                    
         return response_text
 
-    
+    def add_message(self, msg : ChatRoleMessage):
+        """
+        Add a message to the context for presentation to the model.
+        Does not result in a model completion.
+        """
+        self.messages.insert(0, msg)
+        
     def user_message(self, msg_text : str, stream : bool =False) -> ChatResponse:
         msg = UserMessage(text=msg_text)
         # put message at beginning of list

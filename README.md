@@ -73,6 +73,10 @@ The primary method of the ChatContext is the user_message() which is used to ass
 
 This method takes a user's message text as input and generates a response from the chatbot using the conversation context.
 
+### `add_message(msg : ChatRoleMessage)`
+
+Add a message to the context for presentation to the model in subsequent completion requests.
+
 #### Parameters:
 
 - `msg_text` (str): The text of the user's message.
