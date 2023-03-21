@@ -166,7 +166,7 @@ class ChatContext:
 
     def add_message(self, msg : ChatRoleMessage):
         """
-        Add a message to the context for presentation to the model.
+        Add a message to the context for presentation to the model in subsequent completion requests.
         Does not result in a model completion.
         """
         self.messages.insert(0, msg)
