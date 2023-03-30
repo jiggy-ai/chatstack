@@ -29,7 +29,7 @@ Chatstack finds your OpenAI API key via the OPENAI_API_KEY environment variable.
 
 1. Import the `ChatContext` class.
 2. Create an instance of the `ChatContext` class with the desired configuration.
-3. Call the `user_message` method with the user's message text to get a response from the chatbot.
+3. Call the `user_message` or `user_message_stream` methods with the user's message text to get a response from the chatbot.
 
 Example:
 
@@ -48,7 +48,8 @@ def main():
         user_input = input("You: ")      
         print("Chatbot:")
         response = chat_context.user_message(user_input, stream=True)
-        
+        print(response.text)
+
 
 if __name__ == "__main__":
     main()
@@ -69,9 +70,15 @@ The `ChatContext` class accepts the following parameters:
 
 The primary method of the ChatContext is the user_message() which is used to assemble the input context to the model and generate a completion.
 
-### `user_message(msg_text: str, stream: bool = False) -> ChatCompletionContext`
+
+### `user_message(msg_text: str) -> ChatResponse`
 
 This method takes a user's message text as input and generates a response from the chatbot using the conversation context.
+
+### `user_message_stream(msg_text: str) -> ChatResponse`
+
+This method is a generator that takes a user's message text as input and yields `ChatResponse` objects containing the incremental and cumulative response text from the chatbot using the conversation context.
+
 
 ### `add_message(msg : ChatRoleMessage)`
 
@@ -80,7 +87,6 @@ Add a message to the context for presentation to the model in subsequent complet
 #### Parameters:
 
 - `msg_text` (str): The text of the user's message.
-- `stream` (bool, optional): If set to `True`, the response will be streamed to the console as it is generated. Default is `False`.
 
 #### Returns:
 
