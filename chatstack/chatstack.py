@@ -7,6 +7,7 @@ import tiktoken
 from time import time
 import sys
 from .pricing import price
+from typing import List, Optional, Tuple
 
 encoder = tiktoken.get_encoding('cl100k_base')
 
@@ -65,12 +66,13 @@ class ChatResponse(BaseModel):
     and other details such as the model used, the number of tokens used, and the estimated cost of the request
     """
     text:               str                             # the completion response from the model
+    delta:              Optional[str]                   # the response text delta for streaming case
     model:              str                             # the model used to generate the response
     temperature:        float                           # the temperature used to generate the response
     inputs:             List[ChatRoleMessage]           # the input context as sent to the model    
     input_tokens:       int                             # the number of tokens used in the input context
-    response_tokens:    int                             # the number of tokens in the response text
-    price:              float                           # the estimated price of the request in dollars
+    response_tokens:    int                             # the number of tokens in the response text.  only valid on last output for streaming
+    price:              float                           # the estimated price of the request in dollars. only valid on last output for streaming
 
 
 GPT3_MODELS = ['gpt-3.5-turbo', 'gpt-3.5-turbo-0301']
@@ -132,7 +134,7 @@ class ChatContext:
 
 
     @retry(tries=10, delay=.05, ExceptionToRaise=openai.InvalidRequestError)
-    def _completion(self, msgs :ChatRoleMessage, stream=False) -> str:
+    def _completion(self, msgs :ChatRoleMessage) -> str:
 
         messages = [{"role": msg.role, "content": msg.text} for msg in msgs]
         
@@ -141,25 +143,14 @@ class ChatContext:
             response =  openai.ChatCompletion.create(model = self.model,
                                                      messages = messages,
                                                      max_tokens = self.max_response_tokens,
-                                                     temperature = self.temperature,
-                                                     stream=stream)
+                                                     temperature = self.temperature)
         except openai.error.RateLimitError as e:
             logger.info(f'OpenAI RateLimitError, retrying...')
             raise
         except Exception as e:
             logger.warning(f'Exception during openai.ChatCompletion.create: {e}, retrying...')
-            raise
-        
-        response_text = ""
-        if stream:
-            for chunk in response:
-                output = chunk['choices'][0]['delta'].get('content', '')
-                response_text += output
-                sys.stdout.write(output)
-                sys.stdout.flush()
-            sys.stdout.write("\n")
-        else:
-            response_text = response['choices'][0]['message']['content']
+            raise            
+        response_text = response['choices'][0]['message']['content']
         dt = time() - t0
         #logger.info(f'completion time: {dt:.3f} s')                                                    
         return response_text
@@ -171,12 +162,12 @@ class ChatContext:
         """
         self.messages.insert(0, msg)
         
-    def user_message(self, msg_text : str, stream : bool =False) -> ChatResponse:
+    def user_message(self, msg_text : str) -> ChatResponse:
         msg = UserMessage(text=msg_text)
         # put message at beginning of list
         self.messages.insert(0, msg)
         completion_msgs = self._compose_completion_msg()
-        response_text = self._completion(completion_msgs, stream=stream)
+        response_text = self._completion(completion_msgs)
         response_msg = AssistantMessage(text=response_text)
         self.messages.insert(0, response_msg)
         
@@ -190,5 +181,59 @@ class ChatContext:
                           price=price(self.model, input_tokens, response_msg.tokens))
                                     
         return cr
+    
+    @retry(tries=10, delay=.05, ExceptionToRaise=openai.InvalidRequestError)
+    def _completion_stream(self, msgs :ChatRoleMessage) -> ChatResponse:
+        """
+        return tuple of (delta, response, done):  
+        where delta is the incremental response text,
+        response is the cumulative response text,
+        and done is True if the completion is complete
+        """
+        cr = ChatResponse(text = "",
+                          delta = "",
+                          model = self.model,
+                          temperature=self.temperature,
+                          inputs=msgs,
+                          input_tokens=sum([msg.tokens for msg in msgs]) + 2 ,
+                          response_tokens=0,
+                          price=0)
+        
+        oai_messages = [{"role": msg.role, "content": msg.text} for msg in msgs]
+        try:
+            response = openai.ChatCompletion.create(model=self.model,
+                                                    messages=oai_messages,
+                                                    stream=True,
+                                                    max_tokens = self.max_response_tokens)
+            for chunk in response:
+                output = chunk['choices'][0]['delta'].get('content', '')
+                if output:
+                    cr.delta = output
+                    cr.text += output
+                    yield cr
+            
+        except openai.error.RateLimitError as e:   
+            logger.warning(f"OpenAI RateLimitError: {e}")
+            raise
+        except openai.error.InvalidRequestError as e: # too many token
+            logger.error(f"OpenAI InvalidRequestError: {e}")
+            raise
+        except Exception as e:
+            logger.exception(e)
+            raise
+        resp_msg = AssistantMessage(text=cr.text)
+        self.messages.insert(0, resp_msg)  # add response to context
+        cr.response_tokens=resp_msg.tokens
+        cr.price=price(self.model, cr.input_tokens, resp_msg.tokens)
+        yield cr
+
+    def user_message_stream(self, msg_text) -> ChatResponse:
+        msg = UserMessage(text=msg_text)
+        # put message at beginning of list
+        self.messages.insert(0, msg)
+        msgs = self._compose_completion_msg()
+        for cr in self._completion_stream(msgs):
+            yield cr
+        
     
         

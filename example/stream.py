@@ -1,4 +1,5 @@
 from chatstack import ChatContext
+import sys
 
 BASE_SYSTEM_PROMPT  = "You are a clever bot.  Do not apologize, or make excuses.  "
 BASE_SYSTEM_PROMPT += "Do not mention that you are an AI language model since that is annoying to users."
@@ -11,9 +12,11 @@ def main():
     while True:
         user_input = input("You: ")      
         print("Chatbot:")
-        response = chat_context.user_message(user_input)
-        print(response.text)
+        for chat_rsp in chat_context.user_message_stream(user_input):
+            sys.stdout.write(chat_rsp.delta)
+            sys.stdout.flush()
         # print token usage and price
-        print(f"({response.input_tokens + response.response_tokens} tokens (${response.price:.4f}))")
+        print(f"({chat_rsp.input_tokens + chat_rsp.response_tokens} tokens (${chat_rsp.price:.4f}))")
+        
 if __name__ == "__main__":
     main()
