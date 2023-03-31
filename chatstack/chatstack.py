@@ -112,8 +112,7 @@ class ChatContext:
         maximum of chat_context_messages user/assistant messages
         dynamic_context fills the remaining space
         returns list of finalized ChatRoleMessage to feed to model as well as the raw dynamic completion text for future matching purposes
-        """
-        logger.info(f'composing completion message with {len(dynamic_context)} dynamic context messages')
+        """        
         max_input_context = self.max_model_context - self.min_response_tokens
         logger.info(f'maximum input context: {max_input_context} tokens')
         chat_messages = []
