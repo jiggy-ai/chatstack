@@ -114,14 +114,14 @@ class ChatContext:
         returns list of finalized ChatRoleMessage to feed to model as well as the raw dynamic completion text for future matching purposes
         """        
         max_input_context = self.max_model_context - self.min_response_tokens
-        logger.info(f'maximum input context: {max_input_context} tokens')
+        #logger.info(f'maximum input context: {max_input_context} tokens')
         chat_messages = []
         chat_tokens = 0
         for msg in self.messages[:self.chat_context_messages]:
             chat_messages.append(msg)
             chat_tokens += msg.tokens
         chat_messages.reverse()   # put chat messages back in chronological order
-        logger.info(f'chat messages: {chat_tokens} tokens')
+        #logger.info(f'chat messages: {chat_tokens} tokens')
         
         # compute the maximum number of tokens to use for dynamic context
         max_dynamic_context = max_input_context - chat_tokens - self.base_system_msg.tokens
@@ -141,7 +141,7 @@ class ChatContext:
         messages.extend(dynamic_context_messages)
         messages.extend(chat_messages)
         # log estimates messages tokens
-        logger.info(f'estimated messages tokens: {sum([msg.tokens for msg in messages])}')
+        #logger.info(f'estimated messages tokens: {sum([msg.tokens for msg in messages])}')
         return messages
 
 
