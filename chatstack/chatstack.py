@@ -125,7 +125,7 @@ class ChatContext:
         
         # compute the maximum number of tokens to use for dynamic context
         max_dynamic_context = max_input_context - chat_tokens - self.base_system_msg.tokens
-        logger.info(f'maximum dynamic context: {max_dynamic_context} tokens')
+        #logger.info(f'maximum dynamic context: {max_dynamic_context} tokens')
                 
         # assemble dynamic context up to the token limit
         dynamic_context_messages = []
