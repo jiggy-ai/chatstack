@@ -62,8 +62,7 @@ The `ChatContext` class accepts the following parameters:
 
 - `min_response_tokens`: Minimum number of tokens to reserve for model completion response.
 - `max_response_tokens`: Maximum number of tokens to allow for model completion response.
-- `max_context_assistant_messages`: Number of recent assistant messages to keep in context.
-- `max_context_user_messages`: Number of recent user messages to keep in context.
+- `chat_context_messages`: Number of recent assistant and user messages to keep in context.
 - `model`: The name of the GPT model to use (default: "gpt-3.5-turbo").
 - `temperature`: The temperature for the model's response generation.
 - `base_system_msg_text`: The base system message text to provide context for the model.
