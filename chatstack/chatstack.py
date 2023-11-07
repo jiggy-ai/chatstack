@@ -78,7 +78,7 @@ class ChatResponse(BaseModel):
 
 
 GPT3_MODELS = ['gpt-3.5-turbo', 'gpt-3.5-turbo-0301']
-GPT4_MODELS = ['gpt-4', 'gpt-4-0314']
+GPT4_MODELS = ['gpt-4', 'gpt-4-0314', 'gpt-4-1106-preview']
 
 class ChatContext:
 
@@ -145,7 +145,7 @@ class ChatContext:
         return messages
 
 
-    @retry(tries=10, delay=.05, ExceptionToRaise=openai.InvalidRequestError)
+    @retry(tries=10, delay=.05, ExceptionToRaise=openai.BadRequestError)
     def _completion(self, msgs :ChatRoleMessage) -> str:
 
         messages = [{"role": msg.role, "content": msg.content()} for msg in msgs]
@@ -194,7 +194,7 @@ class ChatContext:
                                     
         return cr
     
-    @retry(tries=10, delay=.05, ExceptionToRaise=openai.InvalidRequestError)
+    @retry(tries=10, delay=.05, ExceptionToRaise=openai.BadRequestError)
     def _completion_stream(self, msgs :ChatRoleMessage) -> ChatResponse:
         """
         return tuple of (delta, response, done):  
@@ -213,22 +213,22 @@ class ChatContext:
         
         oai_messages = [{"role": msg.role, "content": msg.content()} for msg in msgs]
         try:
-            response = openai.ChatCompletion.create(model=self.model,
-                                                    messages=oai_messages,
-                                                    stream=True,
-                                                    max_tokens = self.max_response_tokens)
+            response = openai.chat.completions.create(model=self.model,
+                                                      messages=oai_messages,
+                                                      stream=True,
+                                                      max_tokens = self.max_response_tokens)
             for chunk in response:
-                output = chunk['choices'][0]['delta'].get('content', '')
+                output = chunk.choices[0].delta.content or ''
                 if output:
                     cr.delta = output
                     cr.text += output
                     yield cr
             
-        except openai.error.RateLimitError as e:   
+        except openai.RateLimitError as e:   
             logger.warning(f"OpenAI RateLimitError: {e}")
             raise
-        except openai.error.InvalidRequestError as e: # too many token
-            logger.error(f"OpenAI InvalidRequestError: {e}")
+        except openai.BadRequestError as e: # too many token
+            logger.error(f"OpenAI BadRequestError: {e}")
             raise
         except Exception as e:
             logger.exception(e)
